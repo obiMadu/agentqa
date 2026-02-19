@@ -1,6 +1,16 @@
-# Agents QA Core
+# AgentQA Core
 
-Open-source core backend + integrations for AgentQA.
+AgentQA lets you unblock your agents anywhere, anytime. Never leave your agents hanging again. Answer questions in seconds and keep work moving while you are away.
+
+AgentQA does one thing: it keeps you in the loop. No dashboards to babysit. No extra noise. Just decisions.
+
+This repository is the open-source core (backend + integrations). It works best with OpenCode today.
+
+## How it works
+
+1) Your agent asks a question (today: via the OpenCode plugin).
+2) You answer from your phone (or any client).
+3) The agent receives the reply and keeps going.
 
 ## Structure
 

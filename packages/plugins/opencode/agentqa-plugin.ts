@@ -201,6 +201,13 @@ export const AgentQAPlugin: Plugin = async (ctx) => {
               inflight.delete(requestID)
               return
             }
+            if (res.status === 402) {
+              await log(ctx, "warn", "Quota exceeded - upgrade to Pro to continue receiving questions.", {
+                requestID,
+              })
+              inflight.delete(requestID)
+              return
+            }
             await log(ctx, "error", "Failed to send question", {
               requestID,
               status: res.status,

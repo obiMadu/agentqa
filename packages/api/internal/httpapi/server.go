@@ -19,18 +19,18 @@ type Server struct {
 	store               store.Store
 	wait                *waiter.Hub
 	push                push.Sender
-	tokens              *auth.TokenService
+	oidcVerifier        *auth.OIDCVerifier
 	apiKeyEncryptionKey []byte
 	logger              *log.Logger
 }
 
-func NewServer(cfg config.Config, store store.Store, wait *waiter.Hub, push push.Sender, tokens *auth.TokenService, logger *log.Logger, apiKeyEncryptionKey []byte) *Server {
+func NewServer(cfg config.Config, store store.Store, wait *waiter.Hub, push push.Sender, oidcVerifier *auth.OIDCVerifier, logger *log.Logger, apiKeyEncryptionKey []byte) *Server {
 	return &Server{
 		cfg:                 cfg,
 		store:               store,
 		wait:                wait,
 		push:                push,
-		tokens:              tokens,
+		oidcVerifier:        oidcVerifier,
 		apiKeyEncryptionKey: apiKeyEncryptionKey,
 		logger:              logger,
 	}
@@ -46,10 +46,9 @@ func (s *Server) Routes() http.Handler {
 
 	router.Get("/healthz", s.handleHealth)
 
-	router.Post("/auth/google", s.handleGoogleAuth)
-
 	router.Group(func(r chi.Router) {
 		r.Use(s.userAuth)
+		r.Get("/me", s.handleMe)
 		r.Get("/api-key", s.handleGetAPIKey)
 		r.Get("/api-key/raw", s.handleGetRawAPIKey)
 		r.Post("/api-key/reset", s.handleResetAPIKey)

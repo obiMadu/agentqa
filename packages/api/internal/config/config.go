@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -11,10 +12,10 @@ type Config struct {
 	DatabaseURL         string
 	DBConnectRetries    int
 	DBConnectDelay      time.Duration
-	JWTSecret           string
 	APIKeyEncryptionKey string
-	GoogleClientID      string
-	AllowDevAuth        bool
+	OIDCIssuer          string
+	OIDCAudiences       []string
+	OIDCTimeout         time.Duration
 	FCMProjectID        string
 	FCMServerKey        string
 	APNSTeamID          string
@@ -30,10 +31,10 @@ func Load() Config {
 		DatabaseURL:         os.Getenv("DATABASE_URL"),
 		DBConnectRetries:    envInt("DB_CONNECT_RETRIES", 12),
 		DBConnectDelay:      envDuration("DB_CONNECT_DELAY", 2*time.Second),
-		JWTSecret:           os.Getenv("JWT_SECRET"),
 		APIKeyEncryptionKey: os.Getenv("API_KEY_ENCRYPTION_KEY"),
-		GoogleClientID:      os.Getenv("GOOGLE_CLIENT_ID"),
-		AllowDevAuth:        os.Getenv("DEV_AUTH") == "1",
+		OIDCIssuer:          os.Getenv("OIDC_ISSUER"),
+		OIDCAudiences:       envCSV("OIDC_AUDIENCE"),
+		OIDCTimeout:         envDuration("OIDC_TIMEOUT", 5*time.Second),
 		FCMProjectID:        os.Getenv("FCM_PROJECT_ID"),
 		FCMServerKey:        os.Getenv("FCM_SERVER_KEY"),
 		APNSTeamID:          os.Getenv("APNS_TEAM_ID"),
@@ -67,4 +68,25 @@ func envDuration(key string, fallback time.Duration) time.Duration {
 		}
 	}
 	return fallback
+}
+
+func envCSV(key string) []string {
+	value := os.Getenv(key)
+	if value == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		out = append(out, trimmed)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

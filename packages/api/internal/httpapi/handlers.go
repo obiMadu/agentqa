@@ -20,62 +20,24 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-func (s *Server) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
-	var req GoogleAuthRequest
-	if err := decodeJSON(r, &req); err != nil {
-		s.errorJSON(w, r, http.StatusBadRequest, "invalid request body", err)
+func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	if userID == "" {
+		s.errorJSON(w, r, http.StatusUnauthorized, "missing user context", nil)
 		return
 	}
 
-	if req.IDToken == "" {
-		s.errorJSON(w, r, http.StatusBadRequest, "id_token is required", nil)
-		return
-	}
-
-	var email string
-	var name string
-
-	if s.cfg.AllowDevAuth {
-		email = req.IDToken
-		if !strings.Contains(email, "@") {
-			email = "dev@example.com"
-		}
-		name = "Dev User"
-	} else {
-		info, err := s.verifyGoogleIDToken(r.Context(), req.IDToken)
-		if err != nil {
-			s.errorJSON(w, r, http.StatusUnauthorized, "invalid google token", err)
+	user, err := s.store.GetUser(r.Context(), userID)
+	if err != nil {
+		if err == store.ErrNotFound {
+			s.errorJSON(w, r, http.StatusNotFound, "user not found", err)
 			return
 		}
-		email = info.Email
-		name = info.Name
-	}
-
-	user, err := s.store.UpsertUser(r.Context(), store.User{
-		Email:        email,
-		Name:         name,
-		AuthProvider: "google",
-	})
-	if err != nil {
-		s.errorJSON(w, r, http.StatusInternalServerError, "user upsert failed", err)
+		s.errorJSON(w, r, http.StatusInternalServerError, "user lookup failed", err)
 		return
 	}
 
-	accessToken, refreshToken, err := s.tokens.Issue(user.ID, user.Email)
-	if err != nil {
-		s.errorJSON(w, r, http.StatusInternalServerError, "token issue failed", err)
-		return
-	}
-
-	writeJSON(w, http.StatusOK, AuthResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		User: UserPayload{
-			ID:    user.ID,
-			Email: user.Email,
-			Name:  user.Name,
-		},
-	})
+	writeJSON(w, http.StatusOK, UserPayload{ID: user.ID, Email: user.Email, Name: user.Name})
 }
 
 func (s *Server) handleGetAPIKey(w http.ResponseWriter, r *http.Request) {

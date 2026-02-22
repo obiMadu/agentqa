@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/agentqa/agentqa/packages/api/internal/store"
 	"gorm.io/gorm"
@@ -23,6 +25,8 @@ func (s *Store) UpsertUser(ctx context.Context, user store.User) (store.User, er
 		Email:        user.Email,
 		Name:         user.Name,
 		AuthProvider: user.AuthProvider,
+		AuthIssuer:   user.AuthIssuer,
+		AuthSubject:  user.AuthSubject,
 	}
 
 	err := s.db.WithContext(ctx).Clauses(
@@ -45,9 +49,108 @@ func (s *Store) UpsertUser(ctx context.Context, user store.User) (store.User, er
 		Email:        record.Email,
 		Name:         record.Name,
 		AuthProvider: record.AuthProvider,
+		AuthIssuer:   record.AuthIssuer,
+		AuthSubject:  record.AuthSubject,
 		CreatedAt:    record.CreatedAt,
 		UpdatedAt:    record.UpdatedAt,
 	}, nil
+}
+
+func (s *Store) GetUser(ctx context.Context, userID string) (store.User, error) {
+	var record userModel
+	err := s.db.WithContext(ctx).
+		Where("id = ?", userID).
+		First(&record).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return store.User{}, store.ErrNotFound
+		}
+		return store.User{}, err
+	}
+
+	return store.User{
+		ID:           record.ID,
+		Email:        record.Email,
+		Name:         record.Name,
+		AuthProvider: record.AuthProvider,
+		AuthIssuer:   record.AuthIssuer,
+		AuthSubject:  record.AuthSubject,
+		CreatedAt:    record.CreatedAt,
+		UpdatedAt:    record.UpdatedAt,
+	}, nil
+}
+
+func (s *Store) GetUserByOIDC(ctx context.Context, issuer, subject string) (store.User, error) {
+	issuer = strings.TrimSpace(issuer)
+	subject = strings.TrimSpace(subject)
+	if issuer == "" || subject == "" {
+		return store.User{}, fmt.Errorf("missing issuer or subject")
+	}
+
+	var record userModel
+	err := s.db.WithContext(ctx).
+		Where("auth_issuer = ? AND auth_subject = ?", issuer, subject).
+		First(&record).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return store.User{}, store.ErrNotFound
+		}
+		return store.User{}, err
+	}
+
+	return store.User{
+		ID:           record.ID,
+		Email:        record.Email,
+		Name:         record.Name,
+		AuthProvider: record.AuthProvider,
+		AuthIssuer:   record.AuthIssuer,
+		AuthSubject:  record.AuthSubject,
+		CreatedAt:    record.CreatedAt,
+		UpdatedAt:    record.UpdatedAt,
+	}, nil
+}
+
+func (s *Store) AttachOIDCToUser(ctx context.Context, userID, issuer, subject string) error {
+	issuer = strings.TrimSpace(issuer)
+	subject = strings.TrimSpace(subject)
+	if issuer == "" || subject == "" {
+		return fmt.Errorf("missing issuer or subject")
+	}
+
+	result := s.db.WithContext(ctx).
+		Model(&userModel{}).
+		Where("id = ? AND auth_issuer IS NULL AND auth_subject IS NULL", userID).
+		Updates(map[string]interface{}{
+			"auth_issuer":  issuer,
+			"auth_subject": subject,
+			"updated_at":   gorm.Expr("now()"),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 1 {
+		return nil
+	}
+
+	var record userModel
+	err := s.db.WithContext(ctx).
+		Select("id", "auth_issuer", "auth_subject").
+		Where("id = ?", userID).
+		First(&record).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return store.ErrNotFound
+		}
+		return err
+	}
+
+	if record.AuthIssuer != nil && record.AuthSubject != nil {
+		if *record.AuthIssuer == issuer && *record.AuthSubject == subject {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("user already linked to different OIDC identity")
 }
 
 func (s *Store) CreateAPIKey(ctx context.Context, userID, name, keyHash, keyPrefix, keyCiphertext, keyNonce string, scopes []string) (store.APIKey, error) {

@@ -13,6 +13,9 @@ var (
 
 type Store interface {
 	UpsertUser(ctx context.Context, user User) (User, error)
+	GetUser(ctx context.Context, userID string) (User, error)
+	GetUserByOIDC(ctx context.Context, issuer, subject string) (User, error)
+	AttachOIDCToUser(ctx context.Context, userID, issuer, subject string) error
 	CreateAPIKey(ctx context.Context, userID, name, keyHash, keyPrefix, keyCiphertext, keyNonce string, scopes []string) (APIKey, error)
 	ListAPIKeys(ctx context.Context, userID string) ([]APIKey, error)
 	GetActiveAPIKey(ctx context.Context, userID string) (APIKey, error)
@@ -43,6 +46,8 @@ type User struct {
 	Email        string
 	Name         string
 	AuthProvider string
+	AuthIssuer   *string
+	AuthSubject  *string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

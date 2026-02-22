@@ -2,16 +2,6 @@ package httpapi
 
 import "github.com/agentqa/agentqa/packages/api/internal/store"
 
-type GoogleAuthRequest struct {
-	IDToken string `json:"id_token"`
-}
-
-type AuthResponse struct {
-	AccessToken  string      `json:"access_token"`
-	RefreshToken string      `json:"refresh_token"`
-	User         UserPayload `json:"user"`
-}
-
 type UserPayload struct {
 	ID    string `json:"id"`
 	Email string `json:"email"`

@@ -2,12 +2,33 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/agentqa/agentqa/packages/api/internal/auth"
 	"github.com/agentqa/agentqa/packages/api/internal/store"
 )
+
+type unauthorizedError struct {
+	cause error
+}
+
+func (e unauthorizedError) Error() string {
+	if e.cause == nil {
+		return "unauthorized"
+	}
+	return e.cause.Error()
+}
+
+func (e unauthorizedError) Unwrap() error {
+	return e.cause
+}
+
+func isUnauthorized(err error) bool {
+	var u unauthorizedError
+	return errors.As(err, &u)
+}
 
 type contextKey string
 
@@ -24,13 +45,17 @@ func (s *Server) userAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		claims, err := s.tokens.Parse(token)
+		user, err := s.authenticateOIDCUser(r.Context(), token)
 		if err != nil {
-			s.errorJSON(w, r, http.StatusUnauthorized, "invalid access token", err)
+			if isUnauthorized(err) {
+				s.errorJSON(w, r, http.StatusUnauthorized, "invalid access token", err)
+				return
+			}
+			s.errorJSON(w, r, http.StatusInternalServerError, "user auth failed", err)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), ctxUserID, claims.UserID)
+		ctx := context.WithValue(r.Context(), ctxUserID, user.ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -70,14 +95,18 @@ func (s *Server) userOrAPIKeyAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		if strings.Count(raw, ".") == 2 {
-			claims, err := s.tokens.Parse(raw)
+		if !strings.HasPrefix(raw, auth.APIKeyPrefix) {
+			user, err := s.authenticateOIDCUser(r.Context(), raw)
 			if err != nil {
-				s.errorJSON(w, r, http.StatusUnauthorized, "invalid access token", err)
+				if isUnauthorized(err) {
+					s.errorJSON(w, r, http.StatusUnauthorized, "invalid access token", err)
+					return
+				}
+				s.errorJSON(w, r, http.StatusInternalServerError, "user auth failed", err)
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), ctxUserID, claims.UserID)
+			ctx := context.WithValue(r.Context(), ctxUserID, user.ID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -99,6 +128,52 @@ func (s *Server) userOrAPIKeyAuth(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, ctxAPIKeyID, apiKey.ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (s *Server) authenticateOIDCUser(ctx context.Context, accessToken string) (store.User, error) {
+	verified, err := s.oidcVerifier.VerifyAccessToken(ctx, accessToken)
+	if err != nil {
+		return store.User{}, unauthorizedError{cause: err}
+	}
+
+	user, err := s.store.GetUserByOIDC(ctx, verified.Issuer, verified.Subject)
+	if err == nil {
+		return user, nil
+	}
+	if err != store.ErrNotFound {
+		return store.User{}, err
+	}
+
+	userInfo, err := s.oidcVerifier.UserInfo(ctx, accessToken)
+	if err != nil {
+		return store.User{}, unauthorizedError{cause: err}
+	}
+
+	email := strings.TrimSpace(userInfo.Email)
+	if email == "" {
+		return store.User{}, unauthorizedError{cause: errors.New("missing email")}
+	}
+
+	name := strings.TrimSpace(userInfo.Name)
+	issuer := verified.Issuer
+	subject := verified.Subject
+
+	user, err = s.store.UpsertUser(ctx, store.User{
+		Email:        email,
+		Name:         name,
+		AuthProvider: "oidc",
+		AuthIssuer:   &issuer,
+		AuthSubject:  &subject,
+	})
+	if err != nil {
+		return store.User{}, err
+	}
+
+	if err := s.store.AttachOIDCToUser(ctx, user.ID, verified.Issuer, verified.Subject); err != nil {
+		return store.User{}, err
+	}
+
+	return user, nil
 }
 
 func userIDFromContext(ctx context.Context) string {

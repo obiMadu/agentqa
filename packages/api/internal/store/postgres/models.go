@@ -45,6 +45,8 @@ type userModel struct {
 	Email        string    `gorm:"type:text;not null;uniqueIndex"`
 	Name         string    `gorm:"type:text"`
 	AuthProvider string    `gorm:"type:text;not null"`
+	AuthIssuer   *string   `gorm:"type:text;uniqueIndex:users_auth_issuer_subject"`
+	AuthSubject  *string   `gorm:"type:text;uniqueIndex:users_auth_issuer_subject"`
 	CreatedAt    time.Time `gorm:"type:timestamptz;not null;default:now()"`
 	UpdatedAt    time.Time `gorm:"type:timestamptz;not null;default:now()"`
 }

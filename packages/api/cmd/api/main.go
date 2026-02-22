@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
@@ -32,6 +33,19 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	if cfg.OIDCIssuer == "" {
+		logger.Fatal("OIDC_ISSUER is required")
+	}
+	if len(cfg.OIDCAudiences) == 0 {
+		logger.Fatal("OIDC_AUDIENCE is required")
+	}
+
+	oidcHTTPClient := &http.Client{Timeout: cfg.OIDCTimeout}
+	oidcVerifier, err := auth.NewOIDCVerifier(context.Background(), cfg.OIDCIssuer, cfg.OIDCAudiences, oidcHTTPClient, cfg.OIDCTimeout)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	db, err := sql.Open("pgx", cfg.DatabaseURL)
 	if err != nil {
 		logger.Fatalf("db open: %v", err)
@@ -57,9 +71,8 @@ func main() {
 	store := postgres.NewStore(gormDB)
 	waitHub := waiter.NewHub()
 	pushSender := push.New(cfg, logger)
-	tokenService := auth.NewTokenService(cfg.JWTSecret)
 
-	server := httpapi.NewServer(cfg, store, waitHub, pushSender, tokenService, logger, apiKeyEncryptionKey)
+	server := httpapi.NewServer(cfg, store, waitHub, pushSender, oidcVerifier, logger, apiKeyEncryptionKey)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,

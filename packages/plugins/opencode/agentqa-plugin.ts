@@ -194,6 +194,13 @@ export const AgentQAPlugin: Plugin = async (ctx) => {
 		})
 
           if (!res.ok) {
+            if (res.status === 428) {
+              await log(ctx, "warn", "Pairing required - approve this agent in the AgentQA mobile app.", {
+                requestID,
+              })
+              inflight.delete(requestID)
+              return
+            }
             await log(ctx, "error", "Failed to send question", {
               requestID,
               status: res.status,

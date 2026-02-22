@@ -151,6 +151,40 @@ func (uiPreferenceModel) TableName() string {
 	return "ui_preferences"
 }
 
+type billingEntitlementModel struct {
+	UserID       string     `gorm:"type:uuid;primaryKey"`
+	User         userModel  `gorm:"constraint:OnDelete:CASCADE;"`
+	ProActive    bool       `gorm:"type:boolean;not null;default:false"`
+	ProExpiresAt *time.Time `gorm:"type:timestamptz"`
+	TrialUsedAt  *time.Time `gorm:"type:timestamptz"`
+	UpdatedAt    time.Time  `gorm:"type:timestamptz;not null;default:now()"`
+}
+
+func (billingEntitlementModel) TableName() string {
+	return "billing_entitlements"
+}
+
+type billingUsageMonthlyModel struct {
+	UserID           string    `gorm:"type:uuid;not null;uniqueIndex:billing_usage_monthly_unique"`
+	User             userModel `gorm:"constraint:OnDelete:CASCADE;"`
+	PeriodStart      time.Time `gorm:"type:timestamptz;not null;uniqueIndex:billing_usage_monthly_unique"`
+	QuestionRequests int       `gorm:"type:int;not null;default:0"`
+}
+
+func (billingUsageMonthlyModel) TableName() string {
+	return "billing_usage_monthly"
+}
+
+type superwallWebhookEventModel struct {
+	EventID    string    `gorm:"type:text;primaryKey"`
+	Payload    []byte    `gorm:"type:jsonb;not null"`
+	ReceivedAt time.Time `gorm:"type:timestamptz;not null;default:now()"`
+}
+
+func (superwallWebhookEventModel) TableName() string {
+	return "superwall_webhook_events"
+}
+
 func AutoMigrate(db *gorm.DB) error {
 	if err := db.Exec("CREATE EXTENSION IF NOT EXISTS pgcrypto").Error; err != nil {
 		return err
@@ -168,6 +202,9 @@ func AutoMigrate(db *gorm.DB) error {
 		&questionModel{},
 		&answerModel{},
 		&uiPreferenceModel{},
+		&billingEntitlementModel{},
+		&billingUsageMonthlyModel{},
+		&superwallWebhookEventModel{},
 	); err != nil {
 		return err
 	}

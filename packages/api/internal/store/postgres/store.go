@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/agentqa/agentqa/packages/api/internal/store"
 	"gorm.io/gorm"
@@ -708,4 +709,112 @@ func (s *Store) UpsertUIPreferences(ctx context.Context, userID string, data sto
 		CreatedAt: record.CreatedAt,
 		UpdatedAt: record.UpdatedAt,
 	}, nil
+}
+
+func (s *Store) StoreSuperwallWebhookEvent(ctx context.Context, eventID string, payload []byte) (bool, error) {
+	record := superwallWebhookEventModel{EventID: eventID, Payload: payload}
+	result := s.db.WithContext(ctx).Clauses(
+		clause.OnConflict{Columns: []clause.Column{{Name: "event_id"}}, DoNothing: true},
+	).Create(&record)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
+}
+
+func (s *Store) GetBillingEntitlements(ctx context.Context, userID string) (store.BillingEntitlements, error) {
+	var record billingEntitlementModel
+	err := s.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		First(&record).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return store.BillingEntitlements{}, store.ErrNotFound
+		}
+		return store.BillingEntitlements{}, err
+	}
+
+	return store.BillingEntitlements{
+		UserID:       record.UserID,
+		ProActive:    record.ProActive,
+		ProExpiresAt: record.ProExpiresAt,
+		TrialUsedAt:  record.TrialUsedAt,
+		UpdatedAt:    record.UpdatedAt,
+	}, nil
+}
+
+func (s *Store) UpsertBillingEntitlements(
+	ctx context.Context,
+	userID string,
+	proActive bool,
+	proExpiresAt *time.Time,
+	markTrialUsed bool,
+) (store.BillingEntitlements, error) {
+	var trialUsedAt *time.Time
+	if markTrialUsed {
+		now := time.Now().UTC()
+		trialUsedAt = &now
+	}
+
+	record := billingEntitlementModel{
+		UserID:       userID,
+		ProActive:    proActive,
+		ProExpiresAt: proExpiresAt,
+		TrialUsedAt:  trialUsedAt,
+	}
+
+	err := s.db.WithContext(ctx).Clauses(
+		clause.OnConflict{
+			Columns: []clause.Column{{Name: "user_id"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"pro_active":     record.ProActive,
+				"pro_expires_at": record.ProExpiresAt,
+				"trial_used_at":  gorm.Expr("COALESCE(billing_entitlements.trial_used_at, ?)", record.TrialUsedAt),
+				"updated_at":     gorm.Expr("now()"),
+			}),
+		},
+		clause.Returning{},
+	).Create(&record).Error
+	if err != nil {
+		return store.BillingEntitlements{}, err
+	}
+
+	return store.BillingEntitlements{
+		UserID:       record.UserID,
+		ProActive:    record.ProActive,
+		ProExpiresAt: record.ProExpiresAt,
+		TrialUsedAt:  record.TrialUsedAt,
+		UpdatedAt:    record.UpdatedAt,
+	}, nil
+}
+
+func (s *Store) GetBillingUsageMonthly(ctx context.Context, userID string, periodStart time.Time) (store.BillingUsageMonthly, error) {
+	var record billingUsageMonthlyModel
+	err := s.db.WithContext(ctx).
+		Where("user_id = ? AND period_start = ?", userID, periodStart).
+		First(&record).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return store.BillingUsageMonthly{}, store.ErrNotFound
+		}
+		return store.BillingUsageMonthly{}, err
+	}
+
+	return store.BillingUsageMonthly{
+		UserID:           record.UserID,
+		PeriodStart:      record.PeriodStart,
+		QuestionRequests: record.QuestionRequests,
+	}, nil
+}
+
+func (s *Store) CountActivePluginInstalls(ctx context.Context, userID string) (int, error) {
+	var count int64
+	err := s.db.WithContext(ctx).
+		Model(&pluginInstallModel{}).
+		Where("user_id = ? AND active = true", userID).
+		Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
 }

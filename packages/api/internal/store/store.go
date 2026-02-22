@@ -9,6 +9,7 @@ import (
 var (
 	ErrNotFound        = errors.New("not found")
 	ErrAlreadyResolved = errors.New("already resolved")
+	ErrQuotaExceeded   = errors.New("quota exceeded")
 )
 
 type Store interface {
@@ -41,6 +42,12 @@ type Store interface {
 	RejectQuestion(ctx context.Context, questionID string, userID *string) error
 	GetUIPreferences(ctx context.Context, userID string) (UIPreferences, error)
 	UpsertUIPreferences(ctx context.Context, userID string, data UIPreferencesData) (UIPreferences, error)
+
+	StoreSuperwallWebhookEvent(ctx context.Context, eventID string, payload []byte) (inserted bool, err error)
+	GetBillingEntitlements(ctx context.Context, userID string) (BillingEntitlements, error)
+	UpsertBillingEntitlements(ctx context.Context, userID string, proActive bool, proExpiresAt *time.Time, markTrialUsed bool) (BillingEntitlements, error)
+	GetBillingUsageMonthly(ctx context.Context, userID string, periodStart time.Time) (BillingUsageMonthly, error)
+	CountActivePluginInstalls(ctx context.Context, userID string) (int, error)
 }
 
 type User struct {
@@ -106,6 +113,20 @@ type Answer struct {
 	UserID     string
 	Body       string
 	CreatedAt  time.Time
+}
+
+type BillingEntitlements struct {
+	UserID       string
+	ProActive    bool
+	ProExpiresAt *time.Time
+	TrialUsedAt  *time.Time
+	UpdatedAt    time.Time
+}
+
+type BillingUsageMonthly struct {
+	UserID           string
+	PeriodStart      time.Time
+	QuestionRequests int
 }
 
 const (

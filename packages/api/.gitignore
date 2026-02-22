@@ -1,0 +1,12 @@
+# Go build artifacts
+bin/
+tmp/
+*.test
+*.out
+coverage.out
+go.sum
+
+# Env
+.env
+.env.*
+!.env.example

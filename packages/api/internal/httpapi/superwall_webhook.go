@@ -100,6 +100,19 @@ func (s *Server) handleSuperwallWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	planValue, _, _, err := s.resolvePlan(r.Context(), userID, now)
+	if err != nil {
+		s.errorJSON(w, r, http.StatusInternalServerError, "plan resolve failed", err)
+		return
+	}
+	if planValue == planFree {
+		_, err := s.store.EnforceSingleActivePluginInstall(r.Context(), userID)
+		if err != nil {
+			s.errorJSON(w, r, http.StatusInternalServerError, "agent limit enforcement failed", err)
+			return
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 

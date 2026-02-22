@@ -320,7 +320,7 @@ func (s *Store) UpsertPluginInstall(ctx context.Context, install store.PluginIns
 		UserID:    install.UserID,
 		Name:      install.Name,
 		KeyID:     install.KeyID,
-		Active:    true,
+		Active:    install.Active,
 	}
 
 	return s.db.WithContext(ctx).Clauses(
@@ -433,6 +433,64 @@ func (s *Store) PairPluginInstall(ctx context.Context, userID, installID string)
 	return nil
 }
 
+func (s *Store) ActivatePluginInstallExclusive(ctx context.Context, userID, installID string) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing pluginInstallModel
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("install_id = ? AND user_id = ?", installID, userID).
+			Take(&existing).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return store.ErrNotFound
+			}
+			return err
+		}
+
+		if err := tx.Model(&pluginInstallModel{}).
+			Where("user_id = ?", userID).
+			Update("active", false).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&pluginInstallModel{}).
+			Where("install_id = ? AND user_id = ?", installID, userID).
+			Update("active", true).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (s *Store) EnforceSingleActivePluginInstall(ctx context.Context, userID string) (string, error) {
+	keptInstallID := ""
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var keep pluginInstallModel
+		lookupErr := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ? AND active = true", userID).
+			Order("last_seen_at DESC NULLS LAST, created_at DESC").
+			First(&keep).Error
+		if lookupErr != nil {
+			if errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return lookupErr
+		}
+
+		keptInstallID = keep.InstallID
+		if err := tx.Model(&pluginInstallModel{}).
+			Where("user_id = ? AND active = true AND install_id <> ?", userID, keptInstallID).
+			Update("active", false).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return keptInstallID, nil
+}
+
 func (s *Store) UpsertDevice(ctx context.Context, device store.Device) error {
 	record := deviceModel{
 		UserID:    device.UserID,
@@ -452,7 +510,12 @@ func (s *Store) UpsertDevice(ctx context.Context, device store.Device) error {
 	).Create(&record).Error
 }
 
-func (s *Store) CreateQuestion(ctx context.Context, question store.Question) error {
+func (s *Store) CreateQuestion(
+	ctx context.Context,
+	question store.Question,
+	periodStart time.Time,
+	monthlyLimit int,
+) (bool, error) {
 	status := question.Status
 	if status == "" {
 		status = "pending"
@@ -472,9 +535,54 @@ func (s *Store) CreateQuestion(ctx context.Context, question store.Question) err
 		Status:    status,
 	}
 
-	return s.db.WithContext(ctx).Clauses(
-		clause.OnConflict{Columns: []clause.Column{{Name: "id"}}, DoNothing: true},
-	).Create(&record).Error
+	created := false
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Clauses(
+			clause.OnConflict{Columns: []clause.Column{{Name: "id"}}, DoNothing: true},
+		).Create(&record)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			created = false
+			return nil
+		}
+
+		if monthlyLimit > 0 {
+			type usageRow struct {
+				QuestionRequests int `gorm:"column:question_requests"`
+			}
+			var usage usageRow
+			periodStart = periodStart.UTC()
+			usageResult := tx.Raw(
+				`
+					INSERT INTO billing_usage_monthly (user_id, period_start, question_requests)
+					VALUES (?, ?, 1)
+					ON CONFLICT (user_id, period_start)
+					DO UPDATE SET question_requests = billing_usage_monthly.question_requests + 1
+					WHERE billing_usage_monthly.question_requests < ?
+					RETURNING question_requests
+				`,
+				question.UserID,
+				periodStart,
+				monthlyLimit,
+			).Scan(&usage)
+			if usageResult.Error != nil {
+				return usageResult.Error
+			}
+			if usageResult.RowsAffected == 0 {
+				return store.ErrQuotaExceeded
+			}
+		}
+
+		created = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return created, nil
 }
 
 func (s *Store) ListQuestions(ctx context.Context, userID string) ([]store.Question, error) {

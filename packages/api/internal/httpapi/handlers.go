@@ -213,14 +213,38 @@ func (s *Server) handlePluginRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	keyID := &keyIDValue
 
+	now := time.Now().UTC()
+	planValue, _, _, err := s.resolvePlan(r.Context(), userID, now)
+	if err != nil {
+		s.errorJSON(w, r, http.StatusInternalServerError, "plan resolve failed", err)
+		return
+	}
+
+	active := true
+	if planValue == planFree {
+		activeCount, err := s.store.CountActivePluginInstalls(r.Context(), userID)
+		if err != nil {
+			s.errorJSON(w, r, http.StatusInternalServerError, "active agent count failed", err)
+			return
+		}
+		if activeCount >= 1 {
+			active = false
+		}
+	}
+
 	if err := s.store.UpsertPluginInstall(r.Context(), store.PluginInstall{
 		InstallID: req.InstallID,
 		UserID:    userID,
 		Name:      name,
 		KeyID:     keyID,
+		Active:    active,
 	}); err != nil {
 		s.errorJSON(w, r, http.StatusInternalServerError, "install link failed", err)
 		return
+	}
+
+	if planValue == planFree {
+		_, _ = s.store.EnforceSingleActivePluginInstall(r.Context(), userID)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]bool{"linked": true})
@@ -284,13 +308,42 @@ func (s *Server) handleUpdatePluginInstall(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := s.store.UpdatePluginInstallActive(r.Context(), userID, installID, *req.Active); err != nil {
-		if err == store.ErrNotFound {
-			s.errorJSON(w, r, http.StatusNotFound, "install not found", err)
+	if *req.Active {
+		now := time.Now().UTC()
+		planValue, _, _, err := s.resolvePlan(r.Context(), userID, now)
+		if err != nil {
+			s.errorJSON(w, r, http.StatusInternalServerError, "plan resolve failed", err)
 			return
 		}
-		s.errorJSON(w, r, http.StatusInternalServerError, "install update failed", err)
-		return
+
+		if planValue == planFree {
+			if err := s.store.ActivatePluginInstallExclusive(r.Context(), userID, installID); err != nil {
+				if err == store.ErrNotFound {
+					s.errorJSON(w, r, http.StatusNotFound, "install not found", err)
+					return
+				}
+				s.errorJSON(w, r, http.StatusInternalServerError, "install update failed", err)
+				return
+			}
+		} else {
+			if err := s.store.UpdatePluginInstallActive(r.Context(), userID, installID, true); err != nil {
+				if err == store.ErrNotFound {
+					s.errorJSON(w, r, http.StatusNotFound, "install not found", err)
+					return
+				}
+				s.errorJSON(w, r, http.StatusInternalServerError, "install update failed", err)
+				return
+			}
+		}
+	} else {
+		if err := s.store.UpdatePluginInstallActive(r.Context(), userID, installID, false); err != nil {
+			if err == store.ErrNotFound {
+				s.errorJSON(w, r, http.StatusNotFound, "install not found", err)
+				return
+			}
+			s.errorJSON(w, r, http.StatusInternalServerError, "install update failed", err)
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -373,6 +426,7 @@ func (s *Server) handleCreateQuestion(w http.ResponseWriter, r *http.Request) {
 		UserID:    userID,
 		Name:      install.Name,
 		KeyID:     install.KeyID,
+		Active:    install.Active,
 	})
 
 	payload, err := json.Marshal(struct {
@@ -384,15 +438,39 @@ func (s *Server) handleCreateQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.CreateQuestion(r.Context(), store.Question{
+	now := time.Now().UTC()
+	planValue, _, _, err := s.resolvePlan(r.Context(), userID, now)
+	if err != nil {
+		s.errorJSON(w, r, http.StatusInternalServerError, "plan resolve failed", err)
+		return
+	}
+
+	monthlyLimit := 0
+	if planValue == planFree {
+		monthlyLimit = 10
+	}
+
+	created, err := s.store.CreateQuestion(r.Context(), store.Question{
 		ID:        req.RequestID,
 		UserID:    userID,
 		InstallID: req.InstallID,
 		SessionID: req.SessionID,
 		Payload:   payload,
 		Status:    "pending",
-	}); err != nil {
+	}, utcMonthStart(now), monthlyLimit)
+	if err != nil {
+		if err == store.ErrQuotaExceeded {
+			s.errorJSON(w, r, http.StatusPaymentRequired, "quota exceeded", err)
+			return
+		}
 		s.errorJSON(w, r, http.StatusInternalServerError, "question create failed", err)
+		return
+	}
+	if !created {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"created":     false,
+			"question_id": req.RequestID,
+		})
 		return
 	}
 

@@ -31,9 +31,11 @@ type Store interface {
 	UpdatePluginInstallActive(ctx context.Context, userID, installID string, active bool) error
 	RequestPluginInstallPairing(ctx context.Context, userID, installID string) error
 	PairPluginInstall(ctx context.Context, userID, installID string) error
+	ActivatePluginInstallExclusive(ctx context.Context, userID, installID string) error
+	EnforceSingleActivePluginInstall(ctx context.Context, userID string) (keptInstallID string, err error)
 	UpsertDevice(ctx context.Context, device Device) error
 
-	CreateQuestion(ctx context.Context, q Question) error
+	CreateQuestion(ctx context.Context, q Question, periodStart time.Time, monthlyLimit int) (created bool, err error)
 	ListQuestions(ctx context.Context, userID string) ([]Question, error)
 	GetQuestion(ctx context.Context, userID, questionID string) (Question, error)
 	GetQuestionStatus(ctx context.Context, userID, questionID string) (string, error)

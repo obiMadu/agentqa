@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/agentqa/agentqa/packages/api/internal/store"
 )
 
 const (
@@ -71,6 +73,7 @@ func (s *Server) handleSuperwallWebhook(w http.ResponseWriter, r *http.Request) 
 	now := time.Now().UTC()
 	var proExpiresAt *time.Time
 	proActive := false
+	updateProStatus := false
 	if event.Data.ExpirationAt != nil && strings.TrimSpace(*event.Data.ExpirationAt) != "" {
 		parsed, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(*event.Data.ExpirationAt))
 		if err != nil {
@@ -80,14 +83,29 @@ func (s *Server) handleSuperwallWebhook(w http.ResponseWriter, r *http.Request) 
 		parsed = parsed.UTC()
 		proExpiresAt = &parsed
 		proActive = parsed.After(now)
+		updateProStatus = true
 	}
 
 	markTrialUsed := strings.EqualFold(strings.TrimSpace(event.Data.PeriodType), "TRIAL") && strings.TrimSpace(event.Data.Name) == "initial_purchase"
+	if updateProStatus || markTrialUsed {
+		if !updateProStatus {
+			existing, err := s.store.GetBillingEntitlements(r.Context(), userID)
+			if err != nil {
+				if err != store.ErrNotFound {
+					s.errorJSON(w, r, http.StatusInternalServerError, "entitlements lookup failed", err)
+					return
+				}
+			} else {
+				proActive = existing.ProActive
+				proExpiresAt = existing.ProExpiresAt
+			}
+		}
 
-	_, err = s.store.UpsertBillingEntitlements(r.Context(), userID, proActive, proExpiresAt, markTrialUsed)
-	if err != nil {
-		s.errorJSON(w, r, http.StatusInternalServerError, "entitlements update failed", err)
-		return
+		_, err = s.store.UpsertBillingEntitlements(r.Context(), userID, proActive, proExpiresAt, markTrialUsed)
+		if err != nil {
+			s.errorJSON(w, r, http.StatusInternalServerError, "entitlements update failed", err)
+			return
+		}
 	}
 
 	inserted, err := s.store.StoreSuperwallWebhookEvent(r.Context(), eventID, body)

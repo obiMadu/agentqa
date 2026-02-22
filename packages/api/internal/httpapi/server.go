@@ -45,6 +45,7 @@ func (s *Server) Routes() http.Handler {
 	router.Use(s.cors)
 
 	router.Get("/healthz", s.handleHealth)
+	router.Post("/billing/superwall/webhook", s.handleSuperwallWebhook)
 
 	router.Group(func(r chi.Router) {
 		r.Use(s.userAuth)

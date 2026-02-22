@@ -8,40 +8,46 @@ import (
 )
 
 type Config struct {
-	Addr                string
-	DatabaseURL         string
-	DBConnectRetries    int
-	DBConnectDelay      time.Duration
-	APIKeyEncryptionKey string
-	OIDCIssuer          string
-	OIDCAudiences       []string
-	OIDCTimeout         time.Duration
-	FCMProjectID        string
-	FCMServerKey        string
-	APNSTeamID          string
-	APNSKeyID           string
-	APNSPrivateKey      string
-	APNSBundleID        string
-	QuestionTTL         time.Duration
+	Addr                        string
+	DatabaseURL                 string
+	DBConnectRetries            int
+	DBConnectDelay              time.Duration
+	APIKeyEncryptionKey         string
+	OIDCIssuer                  string
+	OIDCAudiences               []string
+	OIDCTimeout                 time.Duration
+	SuperwallWebhookSecret      string
+	SubscriptionOverridePlan    string
+	SubscriptionOverrideUserIDs []string
+	FCMProjectID                string
+	FCMServerKey                string
+	APNSTeamID                  string
+	APNSKeyID                   string
+	APNSPrivateKey              string
+	APNSBundleID                string
+	QuestionTTL                 time.Duration
 }
 
 func Load() Config {
 	return Config{
-		Addr:                envOr("ADDR", ":8080"),
-		DatabaseURL:         os.Getenv("DATABASE_URL"),
-		DBConnectRetries:    envInt("DB_CONNECT_RETRIES", 12),
-		DBConnectDelay:      envDuration("DB_CONNECT_DELAY", 2*time.Second),
-		APIKeyEncryptionKey: os.Getenv("API_KEY_ENCRYPTION_KEY"),
-		OIDCIssuer:          os.Getenv("OIDC_ISSUER"),
-		OIDCAudiences:       envCSV("OIDC_AUDIENCE"),
-		OIDCTimeout:         envDuration("OIDC_TIMEOUT", 5*time.Second),
-		FCMProjectID:        os.Getenv("FCM_PROJECT_ID"),
-		FCMServerKey:        os.Getenv("FCM_SERVER_KEY"),
-		APNSTeamID:          os.Getenv("APNS_TEAM_ID"),
-		APNSKeyID:           os.Getenv("APNS_KEY_ID"),
-		APNSPrivateKey:      os.Getenv("APNS_PRIVATE_KEY"),
-		APNSBundleID:        os.Getenv("APNS_BUNDLE_ID"),
-		QuestionTTL:         envDuration("QUESTION_TTL", 7*24*time.Hour),
+		Addr:                        envOr("ADDR", ":8080"),
+		DatabaseURL:                 os.Getenv("DATABASE_URL"),
+		DBConnectRetries:            envInt("DB_CONNECT_RETRIES", 12),
+		DBConnectDelay:              envDuration("DB_CONNECT_DELAY", 2*time.Second),
+		APIKeyEncryptionKey:         os.Getenv("API_KEY_ENCRYPTION_KEY"),
+		OIDCIssuer:                  os.Getenv("OIDC_ISSUER"),
+		OIDCAudiences:               envCSV("OIDC_AUDIENCE"),
+		OIDCTimeout:                 envDuration("OIDC_TIMEOUT", 5*time.Second),
+		SuperwallWebhookSecret:      os.Getenv("SUPERWALL_WEBHOOK_SECRET"),
+		SubscriptionOverridePlan:    strings.TrimSpace(os.Getenv("SUBSCRIPTION_OVERRIDE_PLAN")),
+		SubscriptionOverrideUserIDs: envCSV("SUBSCRIPTION_OVERRIDE_USER_IDS"),
+		FCMProjectID:                os.Getenv("FCM_PROJECT_ID"),
+		FCMServerKey:                os.Getenv("FCM_SERVER_KEY"),
+		APNSTeamID:                  os.Getenv("APNS_TEAM_ID"),
+		APNSKeyID:                   os.Getenv("APNS_KEY_ID"),
+		APNSPrivateKey:              os.Getenv("APNS_PRIVATE_KEY"),
+		APNSBundleID:                os.Getenv("APNS_BUNDLE_ID"),
+		QuestionTTL:                 envDuration("QUESTION_TTL", 7*24*time.Hour),
 	}
 }
 

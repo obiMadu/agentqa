@@ -75,15 +75,18 @@ func (apiKeyModel) TableName() string {
 }
 
 type pluginInstallModel struct {
-	InstallID  string       `gorm:"type:text;primaryKey"`
-	UserID     string       `gorm:"type:uuid;not null;index"`
-	User       userModel    `gorm:"constraint:OnDelete:CASCADE;"`
-	Name       string       `gorm:"type:text"`
-	KeyID      *string      `gorm:"type:uuid;index"`
-	APIKey     *apiKeyModel `gorm:"foreignKey:KeyID;constraint:OnDelete:SET NULL;"`
-	Active     bool         `gorm:"type:boolean;not null;default:true"`
-	CreatedAt  time.Time    `gorm:"type:timestamptz;not null;default:now()"`
-	LastSeenAt *time.Time   `gorm:"type:timestamptz"`
+	InstallID          string       `gorm:"type:text;primaryKey"`
+	UserID             string       `gorm:"type:uuid;not null;index"`
+	User               userModel    `gorm:"constraint:OnDelete:CASCADE;"`
+	Name               string       `gorm:"type:text"`
+	KeyID              *string      `gorm:"type:uuid;index"`
+	APIKey             *apiKeyModel `gorm:"foreignKey:KeyID;constraint:OnDelete:SET NULL;"`
+	Active             bool         `gorm:"type:boolean;not null;default:true"`
+	Paired             bool         `gorm:"type:boolean;not null;default:false"`
+	PairingRequestedAt *time.Time   `gorm:"type:timestamptz"`
+	PairedAt           *time.Time   `gorm:"type:timestamptz"`
+	CreatedAt          time.Time    `gorm:"type:timestamptz;not null;default:now()"`
+	LastSeenAt         *time.Time   `gorm:"type:timestamptz"`
 }
 
 func (pluginInstallModel) TableName() string {

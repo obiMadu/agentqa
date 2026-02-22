@@ -28,6 +28,8 @@ type Store interface {
 	GetPluginInstall(ctx context.Context, installID string) (PluginInstall, error)
 	ListPluginInstalls(ctx context.Context, userID string) ([]PluginInstall, error)
 	UpdatePluginInstallActive(ctx context.Context, userID, installID string, active bool) error
+	RequestPluginInstallPairing(ctx context.Context, userID, installID string) error
+	PairPluginInstall(ctx context.Context, userID, installID string) error
 	UpsertDevice(ctx context.Context, device Device) error
 
 	CreateQuestion(ctx context.Context, q Question) error
@@ -67,13 +69,16 @@ type APIKey struct {
 }
 
 type PluginInstall struct {
-	InstallID  string
-	UserID     string
-	Name       string
-	KeyID      *string
-	Active     bool
-	CreatedAt  time.Time
-	LastSeenAt *time.Time
+	InstallID          string
+	UserID             string
+	Name               string
+	KeyID              *string
+	Active             bool
+	Paired             bool
+	PairingRequestedAt *time.Time
+	PairedAt           *time.Time
+	CreatedAt          time.Time
+	LastSeenAt         *time.Time
 }
 
 type Device struct {

@@ -241,12 +241,25 @@ func (s *Server) handleListPluginInstalls(w http.ResponseWriter, r *http.Request
 			value := install.LastSeenAt.Format(time.RFC3339)
 			lastSeenAt = &value
 		}
+		var pairingRequestedAt *string
+		if install.PairingRequestedAt != nil {
+			value := install.PairingRequestedAt.Format(time.RFC3339)
+			pairingRequestedAt = &value
+		}
+		var pairedAt *string
+		if install.PairedAt != nil {
+			value := install.PairedAt.Format(time.RFC3339)
+			pairedAt = &value
+		}
 		payload = append(payload, PluginInstallPayload{
-			InstallID:  install.InstallID,
-			Name:       install.Name,
-			Active:     install.Active,
-			CreatedAt:  install.CreatedAt.Format(time.RFC3339),
-			LastSeenAt: lastSeenAt,
+			InstallID:          install.InstallID,
+			Name:               install.Name,
+			Active:             install.Active,
+			Paired:             install.Paired,
+			PairingRequestedAt: pairingRequestedAt,
+			PairedAt:           pairedAt,
+			CreatedAt:          install.CreatedAt.Format(time.RFC3339),
+			LastSeenAt:         lastSeenAt,
 		})
 	}
 
@@ -287,6 +300,29 @@ func (s *Server) handleUpdatePluginInstall(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+func (s *Server) handlePairPluginInstall(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	installID := chi.URLParam(r, "id")
+	if installID == "" {
+		s.errorJSON(w, r, http.StatusBadRequest, "missing install id", nil)
+		return
+	}
+
+	if err := s.store.PairPluginInstall(r.Context(), userID, installID); err != nil {
+		if err == store.ErrNotFound {
+			s.errorJSON(w, r, http.StatusNotFound, "install not found", err)
+			return
+		}
+		s.errorJSON(w, r, http.StatusInternalServerError, "install pair failed", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"paired":     true,
+		"install_id": installID,
+	})
+}
+
 func (s *Server) handleCreateQuestion(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(r.Context())
 
@@ -321,6 +357,14 @@ func (s *Server) handleCreateQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 	if !install.Active {
 		s.errorJSON(w, r, http.StatusForbidden, "install disabled", nil)
+		return
+	}
+	if !install.Paired {
+		if err := s.store.RequestPluginInstallPairing(r.Context(), userID, req.InstallID); err != nil {
+			s.errorJSON(w, r, http.StatusInternalServerError, "pairing request failed", err)
+			return
+		}
+		s.errorJSON(w, r, http.StatusPreconditionRequired, "pairing required", nil)
 		return
 	}
 

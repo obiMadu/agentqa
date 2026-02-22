@@ -30,11 +30,14 @@ type PluginRegisterRequest struct {
 }
 
 type PluginInstallPayload struct {
-	InstallID  string  `json:"install_id"`
-	Name       string  `json:"name"`
-	Active     bool    `json:"active"`
-	CreatedAt  string  `json:"created_at"`
-	LastSeenAt *string `json:"last_seen_at"`
+	InstallID          string  `json:"install_id"`
+	Name               string  `json:"name"`
+	Active             bool    `json:"active"`
+	Paired             bool    `json:"paired"`
+	PairingRequestedAt *string `json:"pairing_requested_at,omitempty"`
+	PairedAt           *string `json:"paired_at,omitempty"`
+	CreatedAt          string  `json:"created_at"`
+	LastSeenAt         *string `json:"last_seen_at"`
 }
 
 type ListPluginInstallsResponse struct {

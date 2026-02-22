@@ -348,13 +348,16 @@ func (s *Store) GetPluginInstall(ctx context.Context, installID string) (store.P
 	}
 
 	return store.PluginInstall{
-		InstallID:  record.InstallID,
-		UserID:     record.UserID,
-		Name:       record.Name,
-		KeyID:      record.KeyID,
-		Active:     record.Active,
-		CreatedAt:  record.CreatedAt,
-		LastSeenAt: record.LastSeenAt,
+		InstallID:          record.InstallID,
+		UserID:             record.UserID,
+		Name:               record.Name,
+		KeyID:              record.KeyID,
+		Active:             record.Active,
+		Paired:             record.Paired,
+		PairingRequestedAt: record.PairingRequestedAt,
+		PairedAt:           record.PairedAt,
+		CreatedAt:          record.CreatedAt,
+		LastSeenAt:         record.LastSeenAt,
 	}, nil
 }
 
@@ -370,13 +373,16 @@ func (s *Store) ListPluginInstalls(ctx context.Context, userID string) ([]store.
 	installs := make([]store.PluginInstall, 0, len(records))
 	for _, record := range records {
 		installs = append(installs, store.PluginInstall{
-			InstallID:  record.InstallID,
-			UserID:     record.UserID,
-			Name:       record.Name,
-			KeyID:      record.KeyID,
-			Active:     record.Active,
-			CreatedAt:  record.CreatedAt,
-			LastSeenAt: record.LastSeenAt,
+			InstallID:          record.InstallID,
+			UserID:             record.UserID,
+			Name:               record.Name,
+			KeyID:              record.KeyID,
+			Active:             record.Active,
+			Paired:             record.Paired,
+			PairingRequestedAt: record.PairingRequestedAt,
+			PairedAt:           record.PairedAt,
+			CreatedAt:          record.CreatedAt,
+			LastSeenAt:         record.LastSeenAt,
 		})
 	}
 
@@ -388,6 +394,35 @@ func (s *Store) UpdatePluginInstallActive(ctx context.Context, userID, installID
 		Model(&pluginInstallModel{}).
 		Where("install_id = ? AND user_id = ?", installID, userID).
 		Update("active", active)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) RequestPluginInstallPairing(ctx context.Context, userID, installID string) error {
+	result := s.db.WithContext(ctx).
+		Model(&pluginInstallModel{}).
+		Where("install_id = ? AND user_id = ? AND paired = false AND pairing_requested_at IS NULL", installID, userID).
+		Update("pairing_requested_at", gorm.Expr("now()"))
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
+func (s *Store) PairPluginInstall(ctx context.Context, userID, installID string) error {
+	result := s.db.WithContext(ctx).
+		Model(&pluginInstallModel{}).
+		Where("install_id = ? AND user_id = ?", installID, userID).
+		Updates(map[string]interface{}{
+			"paired":               true,
+			"paired_at":            gorm.Expr("COALESCE(paired_at, now())"),
+			"pairing_requested_at": gorm.Expr("NULL"),
+		})
 	if result.Error != nil {
 		return result.Error
 	}

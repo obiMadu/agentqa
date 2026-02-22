@@ -57,6 +57,7 @@ func (s *Server) Routes() http.Handler {
 		r.Post("/devices", s.handleRegisterDevice)
 		r.Get("/plugins", s.handleListPluginInstalls)
 		r.Patch("/plugins/{id}", s.handleUpdatePluginInstall)
+		r.Post("/plugins/{id}/pair", s.handlePairPluginInstall)
 		r.Get("/questions", s.handleListQuestions)
 		r.Get("/questions/{id}", s.handleGetQuestion)
 	})

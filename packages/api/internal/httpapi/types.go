@@ -123,3 +123,20 @@ type UIPreferencesResponse struct {
 	Preferences store.UIPreferencesData `json:"preferences"`
 	UpdatedAt   string                  `json:"updated_at"`
 }
+
+type BillingOverridePayload struct {
+	Plan string `json:"plan"`
+}
+
+type BillingStatusResponse struct {
+	Plan             string                  `json:"plan"`
+	ProActive        bool                    `json:"pro_active"`
+	ProExpiresAt     *string                 `json:"pro_expires_at,omitempty"`
+	TrialUsed        bool                    `json:"trial_used"`
+	MonthPeriodStart string                  `json:"month_period_start"`
+	MonthLimit       int                     `json:"month_limit"`
+	MonthUsed        int                     `json:"month_used"`
+	AgentLimit       int                     `json:"agent_limit"`
+	ActiveAgents     int                     `json:"active_agents"`
+	Override         *BillingOverridePayload `json:"override,omitempty"`
+}

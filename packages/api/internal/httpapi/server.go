@@ -53,6 +53,7 @@ func (s *Server) Routes() http.Handler {
 		r.Get("/api-key", s.handleGetAPIKey)
 		r.Get("/api-key/raw", s.handleGetRawAPIKey)
 		r.Post("/api-key/reset", s.handleResetAPIKey)
+		r.Get("/billing/status", s.handleBillingStatus)
 		r.Get("/ui-preferences", s.handleGetUIPreferences)
 		r.Put("/ui-preferences", s.handleUpdateUIPreferences)
 		r.Post("/devices", s.handleRegisterDevice)

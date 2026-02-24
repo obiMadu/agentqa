@@ -204,7 +204,7 @@ func questionTitle(count int, name string) string {
 		return fmt.Sprintf("New questions from %s", agentName)
 	}
 	if count == 1 {
-		return fmt.Sprintf("New question from %s", agentName)
+		return fmt.Sprintf("1 new question from %s", agentName)
 	}
-	return fmt.Sprintf("New %d questions from %s", count, agentName)
+	return fmt.Sprintf("%d new questions from %s", count, agentName)
 }

@@ -907,6 +907,7 @@ func defaultUIPreferences() store.UIPreferencesData {
 		},
 		Theme: &store.ThemePreferences{
 			Accent: store.ThemeAccentGreen,
+			Mode:   store.ThemeModeSystem,
 		},
 		Questions: &store.QuestionPreferences{
 			DisplayMode: store.QuestionDisplayStacked,
@@ -921,10 +922,18 @@ func applyUIPreferencesDefaults(data store.UIPreferencesData) (store.UIPreferenc
 		changed = true
 	}
 	if data.Theme == nil {
-		data.Theme = &store.ThemePreferences{Accent: store.ThemeAccentGreen}
+		data.Theme = &store.ThemePreferences{Accent: store.ThemeAccentGreen, Mode: store.ThemeModeSystem}
 		changed = true
 	} else if strings.TrimSpace(data.Theme.Accent) == "" {
 		data.Theme.Accent = store.ThemeAccentGreen
+		changed = true
+	}
+	mode := strings.TrimSpace(data.Theme.Mode)
+	if mode == "" {
+		data.Theme.Mode = store.ThemeModeSystem
+		changed = true
+	} else if _, ok := store.ValidThemeModes[mode]; !ok {
+		data.Theme.Mode = store.ThemeModeSystem
 		changed = true
 	}
 	if data.Questions == nil {
@@ -963,6 +972,13 @@ func validateUIPreferences(prefs store.UIPreferencesData) error {
 	}
 	if _, ok := store.ValidThemeAccents[accent]; !ok {
 		return errors.New("theme.accent is invalid")
+	}
+	themeMode := strings.TrimSpace(prefs.Theme.Mode)
+	if themeMode == "" {
+		return errors.New("theme.mode is required")
+	}
+	if _, ok := store.ValidThemeModes[themeMode]; !ok {
+		return errors.New("theme.mode is invalid")
 	}
 	if prefs.Questions != nil {
 		displayMode := strings.TrimSpace(prefs.Questions.DisplayMode)

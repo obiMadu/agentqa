@@ -149,12 +149,24 @@ const (
 	ThemeAccentTeal   = "teal"
 )
 
+const (
+	ThemeModeSystem = "system"
+	ThemeModeLight  = "light"
+	ThemeModeDark   = "dark"
+)
+
 var ValidThemeAccents = map[string]struct{}{
 	ThemeAccentGreen:  {},
 	ThemeAccentBlue:   {},
 	ThemeAccentOrange: {},
 	ThemeAccentRed:    {},
 	ThemeAccentTeal:   {},
+}
+
+var ValidThemeModes = map[string]struct{}{
+	ThemeModeSystem: {},
+	ThemeModeLight:  {},
+	ThemeModeDark:   {},
 }
 
 const (
@@ -190,6 +202,7 @@ type BackgroundPreferences struct {
 
 type ThemePreferences struct {
 	Accent string `json:"accent,omitempty"`
+	Mode   string `json:"mode,omitempty"`
 }
 
 type QuestionPreferences struct {

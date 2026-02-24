@@ -814,6 +814,66 @@ func (s *Store) RejectQuestion(ctx context.Context, questionID string, userID *s
 	})
 }
 
+func (s *Store) MarkQuestionsAnswered(ctx context.Context, userID string, questionIDs []string) (int, error) {
+	if len(questionIDs) == 0 {
+		return 0, nil
+	}
+
+	updatedCount := 0
+	answersJSON, err := json.Marshal([][]string{})
+	if err != nil {
+		return 0, err
+	}
+	return updatedCount, s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var pendingIDs []string
+		if err := tx.Model(&questionModel{}).
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ? AND id IN ? AND status = ?", userID, questionIDs, "pending").
+			Pluck("id", &pendingIDs).Error; err != nil {
+			return err
+		}
+		if len(pendingIDs) == 0 {
+			updatedCount = 0
+			return nil
+		}
+
+		answers := make([]answerModel, len(pendingIDs))
+		for i, questionID := range pendingIDs {
+			answers[i] = answerModel{
+				QuestionID: questionID,
+				UserID:     userID,
+				Body:       string(answersJSON),
+			}
+		}
+		if err := tx.Create(&answers).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&questionModel{}).
+			Where("id IN ?", pendingIDs).
+			Updates(map[string]interface{}{
+				"status":      "answered",
+				"answered_at": gorm.Expr("now()"),
+			}).Error; err != nil {
+			return err
+		}
+		updatedCount = len(pendingIDs)
+		return nil
+	})
+}
+
+func (s *Store) DeleteQuestions(ctx context.Context, userID string, questionIDs []string) (int, error) {
+	if len(questionIDs) == 0 {
+		return 0, nil
+	}
+	result := s.db.WithContext(ctx).
+		Where("user_id = ? AND id IN ?", userID, questionIDs).
+		Delete(&questionModel{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return int(result.RowsAffected), nil
+}
+
 func (s *Store) GetUIPreferences(ctx context.Context, userID string) (store.UIPreferences, error) {
 	var record uiPreferenceModel
 	if err := s.db.WithContext(ctx).

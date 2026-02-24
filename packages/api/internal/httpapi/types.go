@@ -105,6 +105,18 @@ type ListQuestionsResponse struct {
 	Questions []QuestionListItem `json:"questions"`
 }
 
+type BulkQuestionActionRequest struct {
+	Action      string   `json:"action"`
+	QuestionIDs []string `json:"question_ids"`
+}
+
+type BulkQuestionActionResponse struct {
+	Action  string `json:"action"`
+	Updated int    `json:"updated"`
+	Deleted int    `json:"deleted"`
+	Skipped int    `json:"skipped"`
+}
+
 type WaitResponse struct {
 	Status     string     `json:"status"`
 	Answers    [][]string `json:"answers,omitempty"`

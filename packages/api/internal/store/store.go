@@ -46,6 +46,8 @@ type Store interface {
 	GetAnswer(ctx context.Context, questionID string) (Answer, error)
 	AnswerQuestion(ctx context.Context, questionID, userID string, answers [][]string) (Answer, error)
 	RejectQuestion(ctx context.Context, questionID string, userID *string) error
+	MarkQuestionsAnswered(ctx context.Context, userID string, questionIDs []string) (int, error)
+	DeleteQuestions(ctx context.Context, userID string, questionIDs []string) (int, error)
 	GetUIPreferences(ctx context.Context, userID string) (UIPreferences, error)
 	UpsertUIPreferences(ctx context.Context, userID string, data UIPreferencesData) (UIPreferences, error)
 

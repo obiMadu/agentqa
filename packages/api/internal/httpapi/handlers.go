@@ -654,6 +654,73 @@ func (s *Server) handleListQuestions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, ListQuestionsResponse{Questions: items})
 }
 
+func (s *Server) handleBulkQuestionAction(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	var req BulkQuestionActionRequest
+	if err := decodeJSON(r, &req); err != nil {
+		s.errorJSON(w, r, http.StatusBadRequest, "invalid request body", err)
+		return
+	}
+
+	action := strings.ToLower(strings.TrimSpace(req.Action))
+	if action == "" {
+		s.errorJSON(w, r, http.StatusBadRequest, "action is required", nil)
+		return
+	}
+	if len(req.QuestionIDs) == 0 {
+		s.errorJSON(w, r, http.StatusBadRequest, "question_ids are required", nil)
+		return
+	}
+
+	seen := make(map[string]struct{}, len(req.QuestionIDs))
+	questionIDs := make([]string, 0, len(req.QuestionIDs))
+	for _, id := range req.QuestionIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		questionIDs = append(questionIDs, trimmed)
+	}
+	if len(questionIDs) == 0 {
+		s.errorJSON(w, r, http.StatusBadRequest, "question_ids are required", nil)
+		return
+	}
+
+	switch action {
+	case "mark_answered":
+		updated, err := s.store.MarkQuestionsAnswered(r.Context(), userID, questionIDs)
+		if err != nil {
+			s.errorJSON(w, r, http.StatusInternalServerError, "bulk answer failed", err)
+			return
+		}
+		writeJSON(w, http.StatusOK, BulkQuestionActionResponse{
+			Action:  action,
+			Updated: updated,
+			Deleted: 0,
+			Skipped: len(questionIDs) - updated,
+		})
+	case "delete":
+		deleted, err := s.store.DeleteQuestions(r.Context(), userID, questionIDs)
+		if err != nil {
+			s.errorJSON(w, r, http.StatusInternalServerError, "bulk delete failed", err)
+			return
+		}
+		writeJSON(w, http.StatusOK, BulkQuestionActionResponse{
+			Action:  action,
+			Updated: 0,
+			Deleted: deleted,
+			Skipped: len(questionIDs) - deleted,
+		})
+	default:
+		s.errorJSON(w, r, http.StatusBadRequest, "unsupported action", nil)
+		return
+	}
+}
+
 func (s *Server) handleGetQuestion(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(r.Context())
 	questionID := chi.URLParam(r, "id")

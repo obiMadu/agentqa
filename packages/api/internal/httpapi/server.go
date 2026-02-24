@@ -63,6 +63,7 @@ func (s *Server) Routes() http.Handler {
 		r.Post("/plugins/{id}/pair", s.handlePairPluginInstall)
 		r.Post("/plugins/{id}/deny", s.handleDenyPluginInstall)
 		r.Get("/questions", s.handleListQuestions)
+		r.Post("/questions/bulk", s.handleBulkQuestionAction)
 		r.Get("/questions/{id}", s.handleGetQuestion)
 	})
 

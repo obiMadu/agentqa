@@ -214,23 +214,13 @@ func (s *Server) handlePluginRegister(w http.ResponseWriter, r *http.Request) {
 	keyID := &keyIDValue
 
 	now := time.Now().UTC()
-	planValue, _, _, err := s.resolvePlan(r.Context(), userID, now)
+	_, _, _, err := s.resolvePlan(r.Context(), userID, now)
 	if err != nil {
 		s.errorJSON(w, r, http.StatusInternalServerError, "plan resolve failed", err)
 		return
 	}
 
-	active := true
-	if planValue == planFree {
-		activeCount, err := s.store.CountActivePluginInstalls(r.Context(), userID)
-		if err != nil {
-			s.errorJSON(w, r, http.StatusInternalServerError, "active agent count failed", err)
-			return
-		}
-		if activeCount >= 1 {
-			active = false
-		}
-	}
+	active := false // Agents start inactive until paired
 
 	if err := s.store.UpsertPluginInstall(r.Context(), store.PluginInstall{
 		InstallID: req.InstallID,
@@ -243,9 +233,8 @@ func (s *Server) handlePluginRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if planValue == planFree {
-		_, _ = s.store.EnforceSingleActivePluginInstall(r.Context(), userID)
-	}
+	// Trigger pairing request immediately upon registration
+	_ = s.store.RequestPluginInstallPairing(r.Context(), userID, req.InstallID)
 
 	writeJSON(w, http.StatusOK, map[string]bool{"linked": true})
 }
@@ -270,17 +259,24 @@ func (s *Server) handleListPluginInstalls(w http.ResponseWriter, r *http.Request
 			value := install.PairingRequestedAt.Format(time.RFC3339)
 			pairingRequestedAt = &value
 		}
+		var pairingDeniedAt *string
+		if install.PairingDeniedAt != nil {
+			value := install.PairingDeniedAt.Format(time.RFC3339)
+			pairingDeniedAt = &value
+		}
 		var pairedAt *string
 		if install.PairedAt != nil {
 			value := install.PairedAt.Format(time.RFC3339)
 			pairedAt = &value
 		}
+
 		payload = append(payload, PluginInstallPayload{
 			InstallID:          install.InstallID,
 			Name:               install.Name,
 			Active:             install.Active,
 			Paired:             install.Paired,
 			PairingRequestedAt: pairingRequestedAt,
+			PairingDeniedAt:    pairingDeniedAt,
 			PairedAt:           pairedAt,
 			CreatedAt:          install.CreatedAt.Format(time.RFC3339),
 			LastSeenAt:         lastSeenAt,
@@ -353,6 +349,29 @@ func (s *Server) handleUpdatePluginInstall(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+func (s *Server) handleDeletePluginInstall(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	installID := chi.URLParam(r, "id")
+	if installID == "" {
+		s.errorJSON(w, r, http.StatusBadRequest, "missing install id", nil)
+		return
+	}
+
+	if err := s.store.DeletePluginInstall(r.Context(), userID, installID); err != nil {
+		if err == store.ErrNotFound {
+			s.errorJSON(w, r, http.StatusNotFound, "install not found", err)
+			return
+		}
+		s.errorJSON(w, r, http.StatusInternalServerError, "install delete failed", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"deleted":    true,
+		"install_id": installID,
+	})
+}
+
 func (s *Server) handlePairPluginInstall(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(r.Context())
 	installID := chi.URLParam(r, "id")
@@ -370,8 +389,42 @@ func (s *Server) handlePairPluginInstall(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Try to automatically activate the agent based on plan limits
+	now := time.Now().UTC()
+	planValue, _, _, err := s.resolvePlan(r.Context(), userID, now)
+	if err == nil {
+		if planValue == planFree {
+			_ = s.store.ActivatePluginInstallExclusive(r.Context(), userID, installID)
+		} else {
+			_ = s.store.UpdatePluginInstallActive(r.Context(), userID, installID, true)
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"paired":     true,
+		"install_id": installID,
+	})
+}
+
+func (s *Server) handleDenyPluginInstall(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	installID := chi.URLParam(r, "id")
+	if installID == "" {
+		s.errorJSON(w, r, http.StatusBadRequest, "missing install id", nil)
+		return
+	}
+
+	if err := s.store.DenyPluginInstallPairing(r.Context(), userID, installID); err != nil {
+		if err == store.ErrNotFound {
+			s.errorJSON(w, r, http.StatusNotFound, "install not found", err)
+			return
+		}
+		s.errorJSON(w, r, http.StatusInternalServerError, "install deny failed", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"denied":     true,
 		"install_id": installID,
 	})
 }

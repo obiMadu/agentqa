@@ -35,6 +35,7 @@ type PluginInstallPayload struct {
 	Active             bool    `json:"active"`
 	Paired             bool    `json:"paired"`
 	PairingRequestedAt *string `json:"pairing_requested_at,omitempty"`
+	PairingDeniedAt    *string `json:"pairing_denied_at,omitempty"`
 	PairedAt           *string `json:"paired_at,omitempty"`
 	CreatedAt          string  `json:"created_at"`
 	LastSeenAt         *string `json:"last_seen_at"`

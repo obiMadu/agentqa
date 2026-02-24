@@ -381,6 +381,7 @@ func (s *Store) ListPluginInstalls(ctx context.Context, userID string) ([]store.
 			Active:             record.Active,
 			Paired:             record.Paired,
 			PairingRequestedAt: record.PairingRequestedAt,
+			PairingDeniedAt:    record.PairingDeniedAt,
 			PairedAt:           record.PairedAt,
 			CreatedAt:          record.CreatedAt,
 			LastSeenAt:         record.LastSeenAt,
@@ -422,6 +423,25 @@ func (s *Store) PairPluginInstall(ctx context.Context, userID, installID string)
 		Updates(map[string]interface{}{
 			"paired":               true,
 			"paired_at":            gorm.Expr("COALESCE(paired_at, now())"),
+			"pairing_requested_at": gorm.Expr("NULL"),
+			"pairing_denied_at":    gorm.Expr("NULL"),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DenyPluginInstallPairing(ctx context.Context, userID, installID string) error {
+	result := s.db.WithContext(ctx).
+		Model(&pluginInstallModel{}).
+		Where("install_id = ? AND user_id = ?", installID, userID).
+		Updates(map[string]interface{}{
+			"paired":               false,
+			"pairing_denied_at":    gorm.Expr("now()"),
 			"pairing_requested_at": gorm.Expr("NULL"),
 		})
 	if result.Error != nil {
@@ -915,11 +935,24 @@ func (s *Store) GetBillingUsageMonthly(ctx context.Context, userID string, perio
 	}, nil
 }
 
+func (s *Store) DeletePluginInstall(ctx context.Context, userID, installID string) error {
+	result := s.db.WithContext(ctx).
+		Where("user_id = ? AND install_id = ?", userID, installID).
+		Delete(&pluginInstallModel{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) CountActivePluginInstalls(ctx context.Context, userID string) (int, error) {
 	var count int64
 	err := s.db.WithContext(ctx).
 		Model(&pluginInstallModel{}).
-		Where("user_id = ? AND active = true", userID).
+		Where("user_id = ? AND active = true AND paired = true", userID).
 		Count(&count).Error
 	if err != nil {
 		return 0, err

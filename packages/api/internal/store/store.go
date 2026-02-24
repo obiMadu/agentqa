@@ -29,8 +29,10 @@ type Store interface {
 	GetPluginInstall(ctx context.Context, installID string) (PluginInstall, error)
 	ListPluginInstalls(ctx context.Context, userID string) ([]PluginInstall, error)
 	UpdatePluginInstallActive(ctx context.Context, userID, installID string, active bool) error
+	DeletePluginInstall(ctx context.Context, userID, installID string) error
 	RequestPluginInstallPairing(ctx context.Context, userID, installID string) error
 	PairPluginInstall(ctx context.Context, userID, installID string) error
+	DenyPluginInstallPairing(ctx context.Context, userID, installID string) error
 	ActivatePluginInstallExclusive(ctx context.Context, userID, installID string) error
 	EnforceSingleActivePluginInstall(ctx context.Context, userID string) (keptInstallID string, err error)
 	UpsertDevice(ctx context.Context, device Device) error
@@ -85,6 +87,7 @@ type PluginInstall struct {
 	Active             bool
 	Paired             bool
 	PairingRequestedAt *time.Time
+	PairingDeniedAt    *time.Time
 	PairedAt           *time.Time
 	CreatedAt          time.Time
 	LastSeenAt         *time.Time

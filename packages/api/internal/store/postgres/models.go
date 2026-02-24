@@ -81,9 +81,10 @@ type pluginInstallModel struct {
 	Name               string       `gorm:"type:text"`
 	KeyID              *string      `gorm:"type:uuid;index"`
 	APIKey             *apiKeyModel `gorm:"foreignKey:KeyID;constraint:OnDelete:SET NULL;"`
-	Active             bool         `gorm:"type:boolean;not null;default:true"`
+	Active             bool         `gorm:"type:boolean;not null;default:false"`
 	Paired             bool         `gorm:"type:boolean;not null;default:false"`
 	PairingRequestedAt *time.Time   `gorm:"type:timestamptz"`
+	PairingDeniedAt    *time.Time   `gorm:"type:timestamptz"`
 	PairedAt           *time.Time   `gorm:"type:timestamptz"`
 	CreatedAt          time.Time    `gorm:"type:timestamptz;not null;default:now()"`
 	LastSeenAt         *time.Time   `gorm:"type:timestamptz"`

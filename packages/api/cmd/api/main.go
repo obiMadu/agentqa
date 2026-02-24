@@ -70,7 +70,7 @@ func main() {
 
 	store := postgres.NewStore(gormDB)
 	waitHub := waiter.NewHub()
-	pushSender := push.New(cfg, logger)
+	pushSender := push.New(cfg, store, logger)
 
 	server := httpapi.NewServer(cfg, store, waitHub, pushSender, oidcVerifier, logger, apiKeyEncryptionKey)
 

@@ -233,8 +233,20 @@ func (s *Server) handlePluginRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Trigger pairing request immediately upon registration
-	_ = s.store.RequestPluginInstallPairing(r.Context(), userID, req.InstallID)
+	requested, err := s.store.RequestPluginInstallPairing(r.Context(), userID, req.InstallID)
+	if err != nil {
+		s.errorJSON(w, r, http.StatusInternalServerError, "pairing request failed", err)
+		return
+	}
+	if requested {
+		if err := s.push.SendPairingRequested(r.Context(), push.PairingMessage{
+			UserID:      userID,
+			InstallID:   req.InstallID,
+			InstallName: name,
+		}); err != nil {
+			s.logger.Printf("push send failed for pairing request %s: %v", req.InstallID, err)
+		}
+	}
 
 	writeJSON(w, http.StatusOK, map[string]bool{"linked": true})
 }
@@ -400,6 +412,22 @@ func (s *Server) handlePairPluginInstall(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	installName := ""
+	if install, err := s.store.GetPluginInstall(r.Context(), installID); err != nil {
+		if err != store.ErrNotFound {
+			s.logger.Printf("install lookup failed for pairing push %s: %v", installID, err)
+		}
+	} else {
+		installName = install.Name
+	}
+	if err := s.push.SendPairingPaired(r.Context(), push.PairingMessage{
+		UserID:      userID,
+		InstallID:   installID,
+		InstallName: installName,
+	}); err != nil {
+		s.logger.Printf("push send failed for pairing success %s: %v", installID, err)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"paired":     true,
 		"install_id": installID,
@@ -466,9 +494,19 @@ func (s *Server) handleCreateQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !install.Paired {
-		if err := s.store.RequestPluginInstallPairing(r.Context(), userID, req.InstallID); err != nil {
+		requested, err := s.store.RequestPluginInstallPairing(r.Context(), userID, req.InstallID)
+		if err != nil {
 			s.errorJSON(w, r, http.StatusInternalServerError, "pairing request failed", err)
 			return
+		}
+		if requested {
+			if err := s.push.SendPairingRequested(r.Context(), push.PairingMessage{
+				UserID:      userID,
+				InstallID:   req.InstallID,
+				InstallName: install.Name,
+			}); err != nil {
+				s.logger.Printf("push send failed for pairing request %s: %v", req.InstallID, err)
+			}
 		}
 		s.errorJSON(w, r, http.StatusPreconditionRequired, "pairing required", nil)
 		return
@@ -536,11 +574,16 @@ func (s *Server) handleCreateQuestion(w http.ResponseWriter, r *http.Request) {
 			preview = req.Questions[0].Header
 		}
 	}
-	_ = s.push.SendQuestion(r.Context(), push.Message{
-		UserID:     userID,
-		QuestionID: req.RequestID,
-		Preview:    preview,
-	})
+	questionCount := len(req.Questions)
+	if err := s.push.SendQuestion(r.Context(), push.Message{
+		UserID:        userID,
+		QuestionID:    req.RequestID,
+		InstallName:   install.Name,
+		QuestionCount: questionCount,
+		Preview:       preview,
+	}); err != nil {
+		s.logger.Printf("push send failed for question %s: %v", req.RequestID, err)
+	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"created":     true,

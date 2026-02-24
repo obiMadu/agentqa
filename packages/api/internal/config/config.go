@@ -19,12 +19,7 @@ type Config struct {
 	SuperwallWebhookSecret      string
 	SubscriptionOverridePlan    string
 	SubscriptionOverrideUserIDs []string
-	FCMProjectID                string
-	FCMServerKey                string
-	APNSTeamID                  string
-	APNSKeyID                   string
-	APNSPrivateKey              string
-	APNSBundleID                string
+	ExpoPushURL                 string
 	QuestionTTL                 time.Duration
 }
 
@@ -41,12 +36,7 @@ func Load() Config {
 		SuperwallWebhookSecret:      os.Getenv("SUPERWALL_WEBHOOK_SECRET"),
 		SubscriptionOverridePlan:    strings.TrimSpace(os.Getenv("SUBSCRIPTION_OVERRIDE_PLAN")),
 		SubscriptionOverrideUserIDs: envCSV("SUBSCRIPTION_OVERRIDE_USER_IDS"),
-		FCMProjectID:                os.Getenv("FCM_PROJECT_ID"),
-		FCMServerKey:                os.Getenv("FCM_SERVER_KEY"),
-		APNSTeamID:                  os.Getenv("APNS_TEAM_ID"),
-		APNSKeyID:                   os.Getenv("APNS_KEY_ID"),
-		APNSPrivateKey:              os.Getenv("APNS_PRIVATE_KEY"),
-		APNSBundleID:                os.Getenv("APNS_BUNDLE_ID"),
+		ExpoPushURL:                 strings.TrimSpace(os.Getenv("EXPO_PUSH_URL")),
 		QuestionTTL:                 envDuration("QUESTION_TTL", 7*24*time.Hour),
 	}
 }

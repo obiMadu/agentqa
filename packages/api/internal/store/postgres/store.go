@@ -405,15 +405,15 @@ func (s *Store) UpdatePluginInstallActive(ctx context.Context, userID, installID
 	return nil
 }
 
-func (s *Store) RequestPluginInstallPairing(ctx context.Context, userID, installID string) error {
+func (s *Store) RequestPluginInstallPairing(ctx context.Context, userID, installID string) (bool, error) {
 	result := s.db.WithContext(ctx).
 		Model(&pluginInstallModel{}).
 		Where("install_id = ? AND user_id = ? AND paired = false AND pairing_requested_at IS NULL", installID, userID).
 		Update("pairing_requested_at", gorm.Expr("now()"))
 	if result.Error != nil {
-		return result.Error
+		return false, result.Error
 	}
-	return nil
+	return result.RowsAffected > 0, nil
 }
 
 func (s *Store) PairPluginInstall(ctx context.Context, userID, installID string) error {
@@ -530,6 +530,30 @@ func (s *Store) UpsertDevice(ctx context.Context, device store.Device) error {
 	).Create(&record).Error
 }
 
+func (s *Store) ListDevices(ctx context.Context, userID string) ([]store.Device, error) {
+	var records []deviceModel
+	if err := s.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("last_seen_at DESC NULLS LAST, created_at DESC").
+		Find(&records).Error; err != nil {
+		return nil, err
+	}
+
+	devices := make([]store.Device, 0, len(records))
+	for _, record := range records {
+		devices = append(devices, store.Device{
+			ID:         record.ID,
+			UserID:     record.UserID,
+			Platform:   record.Platform,
+			PushToken:  record.PushToken,
+			CreatedAt:  record.CreatedAt,
+			LastSeenAt: record.LastSeenAt,
+		})
+	}
+
+	return devices, nil
+}
+
 func (s *Store) CreateQuestion(
 	ctx context.Context,
 	question store.Question,
@@ -632,6 +656,17 @@ func (s *Store) ListQuestions(ctx context.Context, userID string) ([]store.Quest
 	}
 
 	return questions, nil
+}
+
+func (s *Store) CountPendingQuestions(ctx context.Context, userID string) (int, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).
+		Model(&questionModel{}).
+		Where("user_id = ? AND status = ?", userID, "pending").
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return int(count), nil
 }
 
 func (s *Store) GetQuestion(ctx context.Context, userID, questionID string) (store.Question, error) {

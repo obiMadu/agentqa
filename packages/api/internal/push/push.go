@@ -1,26 +1,42 @@
 package push
 
 import (
-  "context"
-  "log"
+	"context"
+	"log"
 
-  "github.com/agentqa/agentqa/packages/api/internal/config"
+	"github.com/agentqa/agentqa/packages/api/internal/config"
+	"github.com/agentqa/agentqa/packages/api/internal/store"
 )
 
 type Message struct {
-  UserID     string
-  QuestionID string
-  Preview    string
+	UserID        string
+	QuestionID    string
+	InstallName   string
+	QuestionCount int
+	Preview       string
+}
+
+type PairingMessage struct {
+	UserID      string
+	InstallID   string
+	InstallName string
 }
 
 type Sender interface {
-  SendQuestion(ctx context.Context, msg Message) error
+	SendQuestion(ctx context.Context, msg Message) error
+	SendPairingRequested(ctx context.Context, msg PairingMessage) error
+	SendPairingPaired(ctx context.Context, msg PairingMessage) error
 }
 
-func New(cfg config.Config, logger *log.Logger) Sender {
-  if cfg.FCMServerKey != "" {
-    return &fcmSender{serverKey: cfg.FCMServerKey, logger: logger}
-  }
+type DeviceStore interface {
+	ListDevices(ctx context.Context, userID string) ([]store.Device, error)
+	CountPendingQuestions(ctx context.Context, userID string) (int, error)
+}
 
-  return &noopSender{logger: logger}
+func New(cfg config.Config, devices DeviceStore, logger *log.Logger) Sender {
+	if cfg.ExpoPushURL != "" && devices != nil {
+		return newExpoSender(cfg.ExpoPushURL, devices, logger)
+	}
+
+	return &noopSender{logger: logger}
 }

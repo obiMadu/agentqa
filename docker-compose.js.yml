@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-agentqa}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-agentqa}"
+      POSTGRES_DB: "${POSTGRES_DB:-agentqa}"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - agentqa-js-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  api-js:
+    build: ./packages/api-js
+    environment:
+      ADDR: "${ADDR:-:8080}"
+      DATABASE_URL: "${DATABASE_URL:-postgres://agentqa:agentqa@db:5432/agentqa?sslmode=disable}"
+      DB_CONNECT_RETRIES: "${DB_CONNECT_RETRIES:-12}"
+      DB_CONNECT_DELAY: "${DB_CONNECT_DELAY:-2s}"
+      API_KEY_ENCRYPTION_KEY: "${API_KEY_ENCRYPTION_KEY:?API_KEY_ENCRYPTION_KEY must be base64-encoded 32 bytes}"
+      BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:8080}"
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}"
+      AUTH_TRUSTED_ORIGINS: "${AUTH_TRUSTED_ORIGINS:-agentqa://}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID:-}"
+      GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET:-}"
+      AUTH_OAUTH_PROVIDER_ID: "${AUTH_OAUTH_PROVIDER_ID:-}"
+      AUTH_OAUTH_ISSUER: "${AUTH_OAUTH_ISSUER:-}"
+      AUTH_OAUTH_CLIENT_ID: "${AUTH_OAUTH_CLIENT_ID:-}"
+      AUTH_OAUTH_CLIENT_SECRET: "${AUTH_OAUTH_CLIENT_SECRET:-}"
+      AUTH_LEGACY_PROVIDER_ID: "${AUTH_LEGACY_PROVIDER_ID:-}"
+      SUPERWALL_WEBHOOK_SECRET: "${SUPERWALL_WEBHOOK_SECRET:-}"
+      SUBSCRIPTION_OVERRIDE_PLAN: "${SUBSCRIPTION_OVERRIDE_PLAN:-}"
+      SUBSCRIPTION_OVERRIDE_USER_IDS: "${SUBSCRIPTION_OVERRIDE_USER_IDS:-}"
+      EXPO_PUSH_URL: "${EXPO_PUSH_URL:-}"
+      QUESTION_TTL: "${QUESTION_TTL:-168h}"
+    ports:
+      - "${API_JS_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  agentqa-js-postgres:

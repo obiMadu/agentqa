@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -45,7 +46,8 @@ func (s *Server) userAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		user, err := s.authenticateOIDCUser(r.Context(), token)
+		idToken := r.Header.Get("X-ID-Token")
+		user, err := s.authenticateOIDCUser(r.Context(), token, idToken)
 		if err != nil {
 			if isUnauthorized(err) {
 				s.errorJSON(w, r, http.StatusUnauthorized, "invalid access token", err)
@@ -96,7 +98,8 @@ func (s *Server) userOrAPIKeyAuth(next http.Handler) http.Handler {
 		}
 
 		if !strings.HasPrefix(raw, auth.APIKeyPrefix) {
-			user, err := s.authenticateOIDCUser(r.Context(), raw)
+			idToken := r.Header.Get("X-ID-Token")
+			user, err := s.authenticateOIDCUser(r.Context(), raw, idToken)
 			if err != nil {
 				if isUnauthorized(err) {
 					s.errorJSON(w, r, http.StatusUnauthorized, "invalid access token", err)
@@ -130,7 +133,7 @@ func (s *Server) userOrAPIKeyAuth(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) authenticateOIDCUser(ctx context.Context, accessToken string) (store.User, error) {
+func (s *Server) authenticateOIDCUser(ctx context.Context, accessToken, idToken string) (store.User, error) {
 	verified, err := s.oidcVerifier.VerifyAccessToken(ctx, accessToken)
 	if err != nil {
 		return store.User{}, unauthorizedError{cause: err}
@@ -144,9 +147,20 @@ func (s *Server) authenticateOIDCUser(ctx context.Context, accessToken string) (
 		return store.User{}, err
 	}
 
-	userInfo, err := s.oidcVerifier.UserInfo(ctx, accessToken)
-	if err != nil {
-		return store.User{}, unauthorizedError{cause: err}
+	// User not found - use ID token to get user info instead of calling UserInfo endpoint
+	var userInfo auth.OIDCUserInfo
+	if idToken != "" {
+		// Verify ID token and extract claims (no network call!)
+		userInfo, err = s.oidcVerifier.VerifyIDToken(ctx, idToken)
+		if err != nil {
+			return store.User{}, unauthorizedError{cause: fmt.Errorf("invalid id token: %w", err)}
+		}
+	} else {
+		// Fallback: call UserInfo endpoint for backward compatibility
+		userInfo, err = s.oidcVerifier.UserInfo(ctx, accessToken)
+		if err != nil {
+			return store.User{}, unauthorizedError{cause: err}
+		}
 	}
 
 	email := strings.TrimSpace(userInfo.Email)

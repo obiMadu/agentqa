@@ -46,68 +46,68 @@ services:
       db:
         condition: service_healthy
 
-  zitadel:
-    restart: unless-stopped
-    image: ghcr.io/zitadel/zitadel:latest
-    command: start-from-init --masterkey "MasterkeyNeedsToHave32Characters"
-    environment:
-      ZITADEL_EXTERNALDOMAIN: "${ZITADEL_EXTERNALDOMAIN:-zitadel}"
-      ZITADEL_EXTERNALPORT: "${ZITADEL_EXTERNALPORT:-8080}"
-      ZITADEL_EXTERNALSECURE: "${ZITADEL_EXTERNALSECURE:-false}"
-      ZITADEL_TLS_ENABLED: "${ZITADEL_TLS_ENABLED:-false}"
+ # zitadel:
+ #   restart: unless-stopped
+ #   image: ghcr.io/zitadel/zitadel:latest
+ #   command: start-from-init --masterkey "MasterkeyNeedsToHave32Characters"
+ #   environment:
+ #     ZITADEL_EXTERNALDOMAIN: "${ZITADEL_EXTERNALDOMAIN:-zitadel}"
+ #     ZITADEL_EXTERNALPORT: "${ZITADEL_EXTERNALPORT:-8080}"
+ #     ZITADEL_EXTERNALSECURE: "${ZITADEL_EXTERNALSECURE:-false}"
+ #     ZITADEL_TLS_ENABLED: "${ZITADEL_TLS_ENABLED:-false}"
 
-      ZITADEL_DATABASE_POSTGRES_HOST: "${ZITADEL_DATABASE_POSTGRES_HOST:-db}"
-      ZITADEL_DATABASE_POSTGRES_PORT: "${ZITADEL_DATABASE_POSTGRES_PORT:-5432}"
-      ZITADEL_DATABASE_POSTGRES_DATABASE: "${ZITADEL_DATABASE_POSTGRES_DATABASE:-zitadel}"
-      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: "${ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME:-agentqa}"
-      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: "${ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD:-agentqa}"
-      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: "${ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE:-disable}"
-      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: "${ZITADEL_DATABASE_POSTGRES_USER_USERNAME:-zitadel}"
-      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: "${ZITADEL_DATABASE_POSTGRES_USER_PASSWORD:-zitadel}"
-      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: "${ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE:-disable}"
+ #     ZITADEL_DATABASE_POSTGRES_HOST: "${ZITADEL_DATABASE_POSTGRES_HOST:-db}"
+ #     ZITADEL_DATABASE_POSTGRES_PORT: "${ZITADEL_DATABASE_POSTGRES_PORT:-5432}"
+ #     ZITADEL_DATABASE_POSTGRES_DATABASE: "${ZITADEL_DATABASE_POSTGRES_DATABASE:-zitadel}"
+ #     ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: "${ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME:-agentqa}"
+ #     ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: "${ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD:-agentqa}"
+ #     ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: "${ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE:-disable}"
+ #     ZITADEL_DATABASE_POSTGRES_USER_USERNAME: "${ZITADEL_DATABASE_POSTGRES_USER_USERNAME:-zitadel}"
+ #     ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: "${ZITADEL_DATABASE_POSTGRES_USER_PASSWORD:-zitadel}"
+ #     ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: "${ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE:-disable}"
 
-      ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: "${ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH:-/current-dir/login-client.pat}"
-      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "${ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED:-false}"
-      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME: "${ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME:-login-client}"
-      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME: "${ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME:-Automatically Initialized IAM_LOGIN_CLIENT}"
-      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE: "${ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE:-2029-01-01T00:00:00Z}"
-      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "${ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED:-true}"
-      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI: "${ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI:-http://localhost:3000/ui/v2/login/}"
-      ZITADEL_OIDC_DEFAULTLOGINURLV2: "${ZITADEL_OIDC_DEFAULTLOGINURLV2:-http://localhost:3000/ui/v2/login/login?authRequest=}"
-      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: "${ZITADEL_OIDC_DEFAULTLOGOUTURLV2:-http://localhost:3000/ui/v2/login/logout?post_logout_redirect=}"
-      ZITADEL_SAML_DEFAULTLOGINURLV2: "${ZITADEL_SAML_DEFAULTLOGINURLV2:-http://localhost:3000/ui/v2/login/login?samlRequest=}"
-    healthcheck:
-      test: ["CMD", "/app/zitadel", "ready"]
-      interval: 10s
-      timeout: 60s
-      retries: 5
-      start_period: 10s
-    user: "0"
-    volumes:
-      - zitadel-files:/current-dir
-    ports:
-      - "8081:8080"
-      - "3000:3000"
-    depends_on:
-      db:
-        condition: service_healthy
+ #     ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: "${ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH:-/current-dir/login-client.pat}"
+ #     ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "${ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED:-false}"
+ #     ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME: "${ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME:-login-client}"
+ #     ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME: "${ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME:-Automatically Initialized IAM_LOGIN_CLIENT}"
+ #     ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE: "${ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE:-2029-01-01T00:00:00Z}"
+ #     ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "${ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED:-true}"
+ #     ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI: "${ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI:-http://localhost:3000/ui/v2/login/}"
+ #     ZITADEL_OIDC_DEFAULTLOGINURLV2: "${ZITADEL_OIDC_DEFAULTLOGINURLV2:-http://localhost:3000/ui/v2/login/login?authRequest=}"
+ #     ZITADEL_OIDC_DEFAULTLOGOUTURLV2: "${ZITADEL_OIDC_DEFAULTLOGOUTURLV2:-http://localhost:3000/ui/v2/login/logout?post_logout_redirect=}"
+ #     ZITADEL_SAML_DEFAULTLOGINURLV2: "${ZITADEL_SAML_DEFAULTLOGINURLV2:-http://localhost:3000/ui/v2/login/login?samlRequest=}"
+ #   healthcheck:
+ #     test: ["CMD", "/app/zitadel", "ready"]
+ #     interval: 10s
+ #     timeout: 60s
+ #     retries: 5
+ #     start_period: 10s
+ #   user: "0"
+ #   volumes:
+ #     - zitadel-files:/current-dir
+ #   ports:
+ #     - "8081:8080"
+ #     - "3000:3000"
+ #   depends_on:
+ #     db:
+ #       condition: service_healthy
 
-  zitadel-login:
-    restart: unless-stopped
-    image: ghcr.io/zitadel/zitadel-login:latest
-    environment:
-      ZITADEL_API_URL: "${ZITADEL_API_URL:-http://localhost:8080}"
-      NEXT_PUBLIC_BASE_PATH: "${NEXT_PUBLIC_BASE_PATH:-/ui/v2/login}"
-      ZITADEL_SERVICE_USER_TOKEN_FILE: "${ZITADEL_SERVICE_USER_TOKEN_FILE:-/current-dir/login-client.pat}"
-    network_mode: service:zitadel
-    user: "0"
-    volumes:
-      - zitadel-files:/current-dir:ro
-    depends_on:
-      zitadel:
-        condition: service_healthy
-        restart: false
+ # zitadel-login:
+ #   restart: unless-stopped
+ #   image: ghcr.io/zitadel/zitadel-login:latest
+ #   environment:
+ #     ZITADEL_API_URL: "${ZITADEL_API_URL:-http://localhost:8080}"
+ #     NEXT_PUBLIC_BASE_PATH: "${NEXT_PUBLIC_BASE_PATH:-/ui/v2/login}"
+ #     ZITADEL_SERVICE_USER_TOKEN_FILE: "${ZITADEL_SERVICE_USER_TOKEN_FILE:-/current-dir/login-client.pat}"
+ #   network_mode: service:zitadel
+ #   user: "0"
+ #   volumes:
+ #     - zitadel-files:/current-dir:ro
+ #   depends_on:
+ #     zitadel:
+ #       condition: service_healthy
+ #       restart: false
 
 volumes:
   agentqa-postgres:
-  zitadel-files:
+  # zitadel-files:

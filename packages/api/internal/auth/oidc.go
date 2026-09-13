@@ -24,6 +24,38 @@ type OIDCUserInfo struct {
 	Name  string
 }
 
+type OIDCIDTokenClaims struct {
+	Email         string `json:"email"`
+	Name          string `json:"name"`
+	EmailVerified bool   `json:"email_verified"`
+}
+
+func (v *OIDCVerifier) VerifyIDToken(ctx context.Context, rawIDToken string) (OIDCUserInfo, error) {
+	idToken := strings.TrimSpace(rawIDToken)
+	if idToken == "" {
+		return OIDCUserInfo{}, errors.New("missing ID token")
+	}
+
+	verifyCtx, cancel := context.WithTimeout(ctx, v.timeout)
+	defer cancel()
+	verifyCtx = oidc.ClientContext(verifyCtx, v.httpClient)
+
+	verifiedToken, err := v.verifier.Verify(verifyCtx, idToken)
+	if err != nil {
+		return OIDCUserInfo{}, fmt.Errorf("id token verification failed: %w", err)
+	}
+
+	var claims OIDCIDTokenClaims
+	if err := verifiedToken.Claims(&claims); err != nil {
+		return OIDCUserInfo{}, fmt.Errorf("failed to parse id token claims: %w", err)
+	}
+
+	return OIDCUserInfo{
+		Email: claims.Email,
+		Name:  claims.Name,
+	}, nil
+}
+
 type OIDCVerifier struct {
 	issuer           string
 	allowedAudiences map[string]struct{}

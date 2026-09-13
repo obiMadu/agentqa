@@ -1,0 +1,15 @@
+{
+  "name": "@agentqa/api-js",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@better-auth/expo": "1.6.23",
+    "better-auth": "1.6.23",
+    "pg": "8.22.0"
+  }
+}
